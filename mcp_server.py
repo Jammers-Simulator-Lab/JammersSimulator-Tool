@@ -25,7 +25,24 @@ app = MCPServer(
     description="Jammers Simulator Official Interface MCP Tools",
 )
 
-client = SimulatorClient(enable_analyzer=True)
+client = SimulatorClient(
+    mode=os.getenv("SIMULATOR_MODE", "local"),
+    problem=os.getenv("SIMULATOR_PROBLEM", "q3"),
+    seed=int(os.getenv("SIMULATOR_SEED", "42")),
+    enable_analyzer=True,
+)
+
+
+@app.tool(
+    name="jammers_ground_truth",
+    description=(
+        "Query the true distribution and parameters of active targets in the arena (positions, types: omni/directional, pointing angles). Available in local simulation mode."
+    ),
+)
+def jammers_ground_truth() -> str:
+    """Get target ground truth in simulation"""
+    res = client.get_ground_truth()
+    return json.dumps(res, ensure_ascii=False, indent=2)
 
 
 @app.tool(
