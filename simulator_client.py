@@ -18,11 +18,20 @@ class SimulatorClient:
         base_url: str = os.getenv("SIMULATOR_URL", "http://127.0.0.1:2026"),
         robot_id: str = os.getenv("ROBOT_ID", "<YOUR_ROBOT_ID>"),
         arena_id: str = "default",
+        enable_analyzer: bool = False,
     ):
         self.base_url = base_url.rstrip("/")
         self.robot_id = robot_id
         self.arena_id = arena_id
         self.request_counter = 0
+        self.enable_analyzer = enable_analyzer
+        self.analyzer = None
+        if enable_analyzer:
+            try:
+                from oracle_analyzer import OracleAnalyzer
+                self.analyzer = OracleAnalyzer()
+            except ImportError:
+                pass
 
     def _gen_req_id(self, prefix: str) -> str:
         self.request_counter += 1
@@ -56,7 +65,10 @@ class SimulatorClient:
             "robot_id": self.robot_id,
             "request_id": self._gen_req_id("enter"),
         }
-        return self._post("/enter", payload)
+        res = self._post("/enter", payload)
+        if self.analyzer and res.get("accepted"):
+            self.analyzer.record_enter(res)
+        return res
 
     def measure(self, x: float, y: float, channel: int) -> Dict[str, Any]:
         """
@@ -73,7 +85,10 @@ class SimulatorClient:
             "position": {"x": float(x), "y": float(y)},
             "channel": int(channel),
         }
-        return self._post("/measure", payload)
+        res = self._post("/measure", payload)
+        if self.analyzer and res.get("accepted"):
+            self.analyzer.record_measure(x, y, channel, res)
+        return res
 
     def clear(self, x: float, y: float, channel: int) -> Dict[str, Any]:
         """
@@ -87,7 +102,10 @@ class SimulatorClient:
             "position": {"x": float(x), "y": float(y)},
             "channel": int(channel),
         }
-        return self._post("/clear", payload)
+        res = self._post("/clear", payload)
+        if self.analyzer and res.get("accepted"):
+            self.analyzer.record_clear(x, y, channel, res)
+        return res
 
     def exit(self) -> Dict[str, Any]:
         """Terminate mission session and finalize log"""
@@ -96,7 +114,25 @@ class SimulatorClient:
             "robot_id": self.robot_id,
             "request_id": self._gen_req_id("exit"),
         }
-        return self._post("/exit", payload)
+        res = self._post("/exit", payload)
+        if self.analyzer and res.get("accepted"):
+            self.analyzer.record_exit(res)
+        return res
+
+    def get_oracle_report(self) -> Dict[str, Any]:
+        """Get the Oracle theoretical lower bound and gap attribution diagnosis"""
+        if not self.analyzer:
+            return {
+                "error": "Analyzer is not enabled. Initialize SimulatorClient with enable_analyzer=True."
+            }
+        return self.analyzer.diagnose()
+
+    def print_oracle_report(self):
+        """Print human-readable diagnostic report to console"""
+        if not self.analyzer:
+            print("[-] Analyzer is not enabled. Initialize SimulatorClient with enable_analyzer=True.")
+            return
+        print(self.analyzer.format_report())
 
     def ping(self, timeout: float = 2.0) -> Dict[str, Any]:
         """Check if the simulator server port is listening and responsive"""

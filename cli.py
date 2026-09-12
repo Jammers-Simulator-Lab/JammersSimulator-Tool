@@ -121,6 +121,33 @@ def handle_status(args):
             sys.exit(1)
 
 
+def handle_evaluate(args):
+    from oracle_analyzer import OracleAnalyzer
+    analyzer = OracleAnalyzer()
+
+    cleared_targets = {}
+    if args.targets:
+        # Format: "ch:x,y;ch:x,y"
+        pairs = args.targets.strip().split(";")
+        for p in pairs:
+            if not p.strip():
+                continue
+            ch_str, xy_str = p.split(":")
+            ch = int(ch_str.strip())
+            x_str, y_str = xy_str.split(",")
+            cleared_targets[ch] = (float(x_str.strip()), float(y_str.strip()))
+
+    report = analyzer.diagnose(
+        cleared_targets=cleared_targets if cleared_targets else None,
+        actual_total_time=args.time if args.time > 0 else None
+    )
+
+    if args.json:
+        print(json.dumps(report, ensure_ascii=False, indent=2))
+    else:
+        print(analyzer.format_report(report))
+
+
 def make_common_parser(is_sub=False):
     common = argparse.ArgumentParser(add_help=False)
     if is_sub:
@@ -159,6 +186,10 @@ def main():
 
     subparsers.add_parser("exit", parents=[sub_common], help="Exit mission and finalize run")
 
+    p_eval = subparsers.add_parser("evaluate", parents=[sub_common], help="Compute Oracle theoretical bound and optimization headroom")
+    p_eval.add_argument("--targets", type=str, default="", help="Cleared target list, format: '11:281.5,141.0;1:455.2,357.9'")
+    p_eval.add_argument("--time", type=float, default=0.0, help="Actual mission virtual time in seconds")
+
     args = parser.parse_args()
 
     commands = {
@@ -167,6 +198,7 @@ def main():
         "measure": handle_measure,
         "clear": handle_clear,
         "exit": handle_exit,
+        "evaluate": handle_evaluate,
     }
 
     commands[args.command](args)

@@ -25,7 +25,7 @@ app = MCPServer(
     description="Jammers Simulator Official Interface MCP Tools",
 )
 
-client = SimulatorClient()
+client = SimulatorClient(enable_analyzer=True)
 
 
 @app.tool(
@@ -102,6 +102,20 @@ def jammers_exit() -> str:
     """Exit mission session"""
     res = client.exit()
     return json.dumps(res, ensure_ascii=False, indent=2)
+
+
+@app.tool(
+    name="jammers_oracle_diagnosis",
+    description=(
+        "Compute the Oracle theoretical lower bound (Open TSPN shortest possible time), "
+        "analyze the 4-factor gap attribution (survey, detour, probing, retry), "
+        "and quantify the actionable optimization headroom for the current mission run."
+    ),
+)
+def jammers_oracle_diagnosis() -> str:
+    """Get Oracle Bound and optimization headroom diagnosis"""
+    rep = client.get_oracle_report()
+    return json.dumps(rep, ensure_ascii=False, indent=2)
 
 
 if __name__ == "__main__":
